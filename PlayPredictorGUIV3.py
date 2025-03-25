@@ -1,8 +1,8 @@
 from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout,
                             QLabel, QLineEdit, QPushButton, QTabWidget, QComboBox,
-                            QTextEdit, QFormLayout, QMessageBox, QSpinBox)
+                            QTextEdit, QFormLayout, QMessageBox, QSpinBox, QColorDialog)
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QColor
 import sqlite3
 import os
 from datetime import datetime
@@ -22,6 +22,7 @@ class PlayPredictorGUI(QWidget):
         self.LONG = 10
         self.BACKED_UP = 80  # Default value for backed up
         self.REDZONE = 20     # Default value for redzone
+        self.BACKGROUND_COLOR = QColor(255, 255, 255)  # Default white background
         self.initUI()
     
     def initUI(self):
@@ -272,23 +273,26 @@ class PlayPredictorGUI(QWidget):
         
         # Apply button
         apply_button = QPushButton('Apply Settings')
-        apply_button.setFixedHeight(50)  # Increased height
-        apply_button.setStyleSheet("""
-            QPushButton {
-                font-weight: bold;
-                font-size: 18px;  /* Increased font size */
-                padding: 12px 24px;
-                border-radius: 6px;
-                background-color: #007AFF;
-                color: white;
-            }
-            QPushButton:hover {
-                background-color: #0062cc;
-            }
-        """)
+        apply_button.setFixedHeight(40)
         apply_button.clicked.connect(self.apply_settings)
         
+        # Background color setting
+        color_layout = QHBoxLayout()
+        color_layout.setSpacing(10)
+        
+        self.color_button = QPushButton('Select Background Color')
+        self.color_button.setFixedHeight(40)
+        self.color_button.clicked.connect(self.select_background_color)
+        
+        self.color_preview = QLabel()
+        self.color_preview.setFixedSize(30, 30)
+        self.color_preview.setStyleSheet(f"background-color: {self.BACKGROUND_COLOR.name()}; border-radius: 5px;")
+        
+        color_layout.addWidget(self.color_button)
+        color_layout.addWidget(self.color_preview)
+        
         settings_layout.addLayout(settings_form)
+        settings_layout.addLayout(color_layout)
         settings_layout.addWidget(apply_button)
         settings_tab.setLayout(settings_layout)
         
@@ -348,6 +352,19 @@ class PlayPredictorGUI(QWidget):
         # Update coach list after all widgets are created
         self.update_coach_list()
     
+    def get_text_color(self, color):
+        """
+        Get appropriate text color based on background color's brightness.
+        """
+        # Calculate luminance (perceived brightness)
+        r = color.redF()
+        g = color.greenF()
+        b = color.blueF()
+        luminance = 0.299 * r + 0.587 * g + 0.114 * b
+        
+        # Return black for light backgrounds, white for dark backgrounds
+        return "black" if luminance > 0.5 else "white"
+        
     def init_combo_boxes(self):
         self.quarter_combo.addItems([''] + [str(i) for i in range(1, 5)] + ['OT'])  
         self.down_combo.addItems([''] + [str(i) for i in range(1, 5)])  
@@ -755,6 +772,17 @@ class PlayPredictorGUI(QWidget):
             QMessageBox.warning(self, "Error", f"Error adding play: {str(e)}")
             print(f"Error details: {str(e)}")
 
+    def select_background_color(self):
+        """
+        Open color dialog to select background color.
+        """
+        color = QColorDialog.getColor(self.BACKGROUND_COLOR, self, "Select Background Color")
+        if color.isValid():
+            self.BACKGROUND_COLOR = color
+            self.color_preview.setStyleSheet(f"background-color: {color.name()}; border-radius: 5px;")
+            
+  
+
     def apply_settings(self):
         """
         Apply the new settings values.
@@ -765,6 +793,27 @@ class PlayPredictorGUI(QWidget):
             self.LONG = self.long_spin.value()
             self.BACKED_UP = self.backed_up_spin.value()
             self.REDZONE = self.redzone_spin.value()
+            
+            # Apply background color and update text colors
+            text_color = self.get_text_color(self.BACKGROUND_COLOR)
+            self.setStyleSheet(f"""
+                QWidget {{
+                    background-color: {self.BACKGROUND_COLOR.name()};
+                }}
+                QLabel {{
+                    color: {text_color};
+                    font-size: 12px;
+                }}
+                QLineEdit, QComboBox {{
+                    padding: 8px;
+                    border: 1px solid #ccc;
+                    border-radius: 4px;
+                    color: {text_color};
+                }}
+                QPushButton {{
+                    color: {text_color};
+                }}
+            """)
             
             # Ensure values are in proper order
             if self.SHORT >= self.MEDIUM or self.MEDIUM >= self.LONG:
