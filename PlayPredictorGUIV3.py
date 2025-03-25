@@ -20,6 +20,8 @@ class PlayPredictorGUI(QWidget):
         self.SHORT = 3
         self.MEDIUM = 7
         self.LONG = 10
+        self.BACKED_UP = 80  # Default value for backed up
+        self.REDZONE = 20     # Default value for redzone
         self.initUI()
     
     def initUI(self):
@@ -251,6 +253,22 @@ class PlayPredictorGUI(QWidget):
         self.long_spin.setValue(self.LONG)
         self.long_spin.setStyleSheet(spinbox_style)
         settings_form.addRow(QLabel('Long Distance Threshold:'), self.long_spin)
+        
+        # Backed Up setting
+        self.backed_up_spin = QSpinBox()
+        self.backed_up_spin.setMinimum(1)
+        self.backed_up_spin.setMaximum(99)
+        self.backed_up_spin.setValue(self.BACKED_UP)
+        self.backed_up_spin.setStyleSheet(spinbox_style)
+        settings_form.addRow(QLabel('Backed Up Threshold:'), self.backed_up_spin)
+        
+        # Redzone setting
+        self.redzone_spin = QSpinBox()
+        self.redzone_spin.setMinimum(1)
+        self.redzone_spin.setMaximum(99)
+        self.redzone_spin.setValue(self.REDZONE)
+        self.redzone_spin.setStyleSheet(spinbox_style)
+        settings_form.addRow(QLabel('Redzone Threshold:'), self.redzone_spin)
         
         # Apply button
         apply_button = QPushButton('Apply Settings')
@@ -509,6 +527,8 @@ class PlayPredictorGUI(QWidget):
             SHORT = self.SHORT
             MEDIUM = self.MEDIUM
             LONG = self.LONG
+            BACKED_UP = self.BACKED_UP
+            REDZONE = self.REDZONE
             
             # Build the query with conditions
             query = """
@@ -544,7 +564,12 @@ class PlayPredictorGUI(QWidget):
             
             # Add yard line condition if provided
             if self.yard_line_spin.text():
-                query += " AND Yard_Line = ?"
+                if int(self.yard_line_spin.text()) >= BACKED_UP:
+                    query += " AND Yard_Line >= ?" + str(BACKED_UP)
+                elif int(self.yard_line_spin.text()) <= REDZONE:
+                    query += " AND Yard_Line <= ?" + str(REDZONE)
+                else:
+                    query += " AND Yard_Line > ?" + str(REDZONE) + " AND Yard_Line < ?" + str(BACKED_UP)
                 params.append(int(self.yard_line_spin.text()))
             
             # Add text conditions if values are provided
@@ -589,7 +614,12 @@ class PlayPredictorGUI(QWidget):
                 params.append(int(self.distance_spin.text()))
             
             if self.yard_line_spin.text():
-                query += " AND Yard_Line = ?"
+                if int(self.yard_line_spin.text()) >= BACKED_UP:
+                    query += " AND Yard_Line >= ?" + str(BACKED_UP)
+                elif int(self.yard_line_spin.text()) <= REDZONE:
+                    query += " AND Yard_Line <= ?" + str(REDZONE)
+                else:
+                    query += " AND Yard_Line > ?" + str(REDZONE) + " AND Yard_Line < ?" + str(BACKED_UP)
                 params.append(int(self.yard_line_spin.text()))
             
             # Add text conditions if values are provided
@@ -733,10 +763,22 @@ class PlayPredictorGUI(QWidget):
             self.SHORT = self.short_spin.value()
             self.MEDIUM = self.medium_spin.value()
             self.LONG = self.long_spin.value()
+            self.BACKED_UP = self.backed_up_spin.value()
+            self.REDZONE = self.redzone_spin.value()
             
             # Ensure values are in proper order
             if self.SHORT >= self.MEDIUM or self.MEDIUM >= self.LONG:
                 QMessageBox.warning(self, "Error", "Short must be less than Medium, and Medium must be less than Long")
+                return
+                
+            # Ensure all distance values are greater than -1
+            if self.SHORT <= -1 or self.MEDIUM <= -1 or self.LONG <= -1:
+                QMessageBox.warning(self, "Error", "Short, Medium, and Long values must be greater than -1")
+                return
+                
+            # Ensure backed up and redzone values are valid
+            if self.BACKED_UP <= 0 or self.REDZONE <= 0:
+                QMessageBox.warning(self, "Error", "Backed Up and Redzone values must be greater than 0")
                 return
                 
             QMessageBox.information(self, "Success", "Settings have been updated successfully")
